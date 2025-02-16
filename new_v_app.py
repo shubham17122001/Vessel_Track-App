@@ -1,102 +1,84 @@
 import streamlit as st
 import pandas as pd
 import folium
-from streamlit_folium import st_folium
-from folium.plugins import MarkerCluster
+from streamlit_folium import folium_static, st_folium
 
-# Streamlit page config
-st.set_page_config(layout="wide")
-
+# Streamlit app title
 st.title("🚢 Vessel Movement Tracker")
 
 # Upload CSV file
-uploaded_file = st.file_uploader("📂 Upload CSV file", type=["csv"])
-
-# Define navigation status codes
-NAVIGATION_STATUS = {
-    0: "Under way using engine",
-    1: "At anchor",
-    2: "Not under command",
-    3: "Restricted maneuverability",
-    4: "Constrained by her draft",
-    5: "Moored",
-    6: "Aground",
-    7: "Engaged in fishing",
-    8: "Under way sailing",
-    9: "Reserved for future use",
-    10: "Reserved for future use",
-    11: "Power-driven vessel towing astern",
-    12: "Power-driven vessel pushing ahead",
-    13: "Reserved for future use",
-    14: "AIS-SART (Search and Rescue)",
-    15: "Undefined"
-}
-
-# Sidebar for Navigation Status Codes
-with st.sidebar:
-    st.subheader("📜 Navigation Status Codes")
-    for code, meaning in NAVIGATION_STATUS.items():
-        st.write(f"**{code}:** {meaning}")
+uploaded_file = st.file_uploader("Upload CSV file", type=["csv"])
 
 if uploaded_file is not None:
+    # Load CSV into DataFrame
     df = pd.read_csv(uploaded_file)
 
     # Ensure required columns exist
-    required_cols = {"MMSI", "Latitude", "Longitude", "Timestamp", "Navigation Status"}
+    required_cols = {"MMSI", "Latitude", "Longitude", "Timestamp"}
     if not required_cols.issubset(df.columns):
-        st.error(f"CSV must contain: {required_cols}")
+        st.error(f"CSV file must contain these columns: {required_cols}")
     else:
+        # Convert timestamp to readable format
         df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit='s')
-        df["Navigation Status"] = df["Navigation Status"].map(NAVIGATION_STATUS)
 
+        # Get unique MMSI numbers for selection
         unique_mmsi = df["MMSI"].unique()
-        selected_mmsi = unique_mmsi[0]  # Automatically select the first MMSI
+        selected_mmsi = st.selectbox("Select MMSI Number", unique_mmsi)
 
+        # Filter data for the selected MMSI
         vessel_data = df[df["MMSI"] == selected_mmsi].sort_values(by="Timestamp")
 
-        # Display Data Table
-        st.subheader(f"📊 Data for MMSI: {selected_mmsi}")
-        st.dataframe(vessel_data, height=400, width=1500)
-
         if not vessel_data.empty:
+            # Extract coordinates for plotting
             locations = list(zip(vessel_data["Latitude"], vessel_data["Longitude"]))
             start_point = locations[0]
             end_point = locations[-1]
 
-            # Create and store map
-            if "map" not in st.session_state:
-                st.session_state.map = folium.Map(location=start_point, zoom_start=7, control_scale=True, tiles="cartodb positron")
-                marker_cluster = MarkerCluster().add_to(st.session_state.map)
+            # Display data fields for selected MMSI
+            st.subheader(f"📊 Data for MMSI: {selected_mmsi}")
+            st.write(vessel_data)
 
-                # Add markers for each position
-                for i, row in vessel_data.iterrows():
-                    popup_text = (
-                        f"📍 **Position Info:**<br>"
-                        f"**MMSI:** {row['MMSI']}<br>"
-                        f"**Latitude:** {row['Latitude']}<br>"
-                        f"**Longitude:** {row['Longitude']}<br>"
-                        f"**Timestamp:** {row['Timestamp']}<br>"
-                        f"**Navigation Status:** {row['Navigation Status']}"
-                    )
+            # Create map centered at the first location
+            m = folium.Map(location=start_point, zoom_start=7)
 
-                    marker = folium.Marker(
-                        location=[row["Latitude"], row["Longitude"]],
-                        popup=popup_text,
-                        icon=folium.Icon(color="blue", icon="info-sign")
-                    )
-                    marker.add_to(marker_cluster)
+            # Dictionary to store popups for each marker
+            marker_popups = {}
 
-                # Mark start and end points
-                folium.Marker(
-                    start_point, popup="🟢 Start Position", icon=folium.Icon(color="green")
-                ).add_to(st.session_state.map)
+            # Add markers for all positions with popups
+            for i, row in vessel_data.iterrows():
+                popup_text = (
+                    f"📍 Position Info:<br>"
+                    f"<b>MMSI:</b> {row['MMSI']}<br>"
+                    f"<b>Latitude:</b> {row['Latitude']}<br>"
+                    f"<b>Longitude:</b> {row['Longitude']}<br>"
+                    f"<b>Timestamp:</b> {row['Timestamp']}"
+                )
 
-                folium.Marker(
-                    end_point, popup="🔴 End Position", icon=folium.Icon(color="red")
-                ).add_to(st.session_state.map)
+                marker = folium.Marker(
+                    location=[row["Latitude"], row["Longitude"]],
+                    popup=popup_text,
+                    icon=folium.Icon(color="blue", icon="info-sign")
+                )
+                marker.add_to(m)
 
-                # Draw the polygon line path
-                folium.PolyLine(locations, color="blue", weight=3, opacity=0.8).add_to(st.session_state.map)
+                # Store marker information
+                marker_popups[(row["Latitude"], row["Longitude"])] = row.to_dict()
 
-            # Display the stored map
-            st_folium(st.session_state.map, width=1000, height=600)
+            # Add markers for start and end points
+            folium.Marker(start_point, popup="Start Position", icon=folium.Icon(color="green")).add_to(m)
+            folium.Marker(end_point, popup="End Position", icon=folium.Icon(color="red")).add_to(m)
+
+            # Add polyline for movement path
+            folium.PolyLine(locations, color="blue", weight=2.5, opacity=1).add_to(m)
+
+            # Display the map in Streamlit
+            map_data = st_folium(m, width=700, height=500)
+
+            # Check if a marker is clicked
+            if map_data["last_clicked"]:
+                clicked_coords = tuple(map_data["last_clicked"].values())
+                if clicked_coords in marker_popups:
+                    st.subheader("📌 Selected Position Data:")
+                    st.write(pd.DataFrame([marker_popups[clicked_coords]]))
+        else:
+            st.error(f"No data available for MMSI {selected_mmsi}")
