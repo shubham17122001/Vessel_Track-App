@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import folium
-from folium.plugins import MarkerCluster
 from streamlit_folium import folium_static
 
 # Streamlit app title
@@ -41,6 +40,14 @@ if uploaded_file is not None:
 
             # Create map centered at the first location
             m = folium.Map(location=start_point, zoom_start=7)
+
+            # Add markers for all positions with popups
+            for i, row in vessel_data.iterrows():
+                folium.Marker(
+                    location=[row["Latitude"], row["Longitude"]],
+                    popup=folium.Popup(f"📍 Position Info:<br><b>MMSI:</b> {row['MMSI']}<br><b>Time:</b> {row['Timestamp']}", max_width=250),
+                    icon=folium.Icon(color="blue", icon="info-sign")
+                ).add_to(m)
 
             # Add markers for start and end points
             folium.Marker(start_point, popup="Start Position", icon=folium.Icon(color="green")).add_to(m)
