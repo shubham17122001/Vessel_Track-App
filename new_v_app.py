@@ -65,9 +65,24 @@ if uploaded_file is not None:
                 # Store marker information
                 marker_popups[(row["Latitude"], row["Longitude"])] = row.to_dict()
 
-            # Add markers for start and end points
-            folium.Marker(start_point, popup="Start Position", icon=folium.Icon(color="green")).add_to(m)
-            folium.Marker(end_point, popup="End Position", icon=folium.Icon(color="red")).add_to(m)
+            # Add markers for start and end points with popups
+            start_popup_text = (
+                f"📍 Start Position:<br>"
+                f"<b>MMSI:</b> {selected_mmsi}<br>"
+                f"<b>Latitude:</b> {start_point[0]}<br>"
+                f"<b>Longitude:</b> {start_point[1]}<br>"
+                f"<b>Timestamp:</b> {vessel_data.iloc[0]['Timestamp']}"
+            )
+            folium.Marker(start_point, popup=start_popup_text, icon=folium.Icon(color="green")).add_to(m)
+
+            end_popup_text = (
+                f"📍 End Position:<br>"
+                f"<b>MMSI:</b> {selected_mmsi}<br>"
+                f"<b>Latitude:</b> {end_point[0]}<br>"
+                f"<b>Longitude:</b> {end_point[1]}<br>"
+                f"<b>Timestamp:</b> {vessel_data.iloc[-1]['Timestamp']}"
+            )
+            folium.Marker(end_point, popup=end_popup_text, icon=folium.Icon(color="red")).add_to(m)
 
             # Add polyline for movement path
             folium.PolyLine(locations, color="blue", weight=2.5, opacity=1).add_to(m)
