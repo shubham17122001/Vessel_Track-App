@@ -7,7 +7,6 @@ from folium.plugins import MarkerCluster
 # Streamlit page config
 st.set_page_config(layout="wide")
 
-# App title
 st.title("🚢 Vessel Movement Tracker")
 
 # Upload CSV file
@@ -40,7 +39,6 @@ with st.sidebar:
         st.write(f"**{code}:** {meaning}")
 
 if uploaded_file is not None:
-    # Load CSV into DataFrame
     df = pd.read_csv(uploaded_file)
 
     # Ensure required columns exist
@@ -48,46 +46,44 @@ if uploaded_file is not None:
     if not required_cols.issubset(df.columns):
         st.error(f"CSV must contain: {required_cols}")
     else:
-        # Convert timestamp to readable format
         df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit='s')
-        
-        # Convert Navigation_Status to readable format
         df["Navigation Status"] = df["Navigation Status"].map(NAVIGATION_STATUS)
 
-        # Get unique MMSI numbers
         unique_mmsi = df["MMSI"].unique()
         selected_mmsi = st.selectbox("🚢 Select MMSI Number", unique_mmsi)
 
-        # Filter data for selected MMSI
+        # Buttons for actions
+        if "show_table" not in st.session_state:
+            st.session_state.show_table = False
+        if "show_map" not in st.session_state:
+            st.session_state.show_map = False
+
+        col1, col2 = st.columns([1, 1])
+
+        with col1:
+            if st.button("📋 Display Data Table"):
+                st.session_state.show_table = True
+
+        with col2:
+            if st.button("🗺️ Plot Ship Movements"):
+                st.session_state.show_map = True
+
         vessel_data = df[df["MMSI"] == selected_mmsi].sort_values(by="Timestamp")
 
-        # Create buttons
-        show_table = st.button("📋 Display Data Table")
-        show_map = st.button("🗺️ Plot Ship Movements")
-
-        # If "Display Data Table" is clicked, show table with increased width
-        if show_table:
+        if st.session_state.show_table:
             st.subheader(f"📊 Data for MMSI: {selected_mmsi}")
-            st.dataframe(vessel_data.style.set_properties(**{'white-space': 'nowrap'}), height=400, width=1500)
+            st.dataframe(vessel_data, height=400, width=1500)
 
-        # If "Plot Ship Movements" is clicked, show map
-        if show_map:
-            if not vessel_data.empty:
-                # Extract coordinates for plotting
-                locations = list(zip(vessel_data["Latitude"], vessel_data["Longitude"]))
-                start_point = locations[0]
-                end_point = locations[-1]
+        if st.session_state.show_map and not vessel_data.empty:
+            locations = list(zip(vessel_data["Latitude"], vessel_data["Longitude"]))
+            start_point = locations[0]
+            end_point = locations[-1]
 
-                # Create map centered at the start location
-                m = folium.Map(location=start_point, zoom_start=7, control_scale=True, tiles="cartodb positron")
+            # Store the map in session state to prevent it from disappearing
+            if "map" not in st.session_state:
+                st.session_state.map = folium.Map(location=start_point, zoom_start=7, control_scale=True, tiles="cartodb positron")
+                marker_cluster = MarkerCluster().add_to(st.session_state.map)
 
-                # Marker Cluster for better visualization
-                marker_cluster = MarkerCluster().add_to(m)
-
-                # Dictionary to store popups for each marker
-                marker_popups = {}
-
-                # Add markers for all positions
                 for i, row in vessel_data.iterrows():
                     popup_text = (
                         f"📍 **Position Info:**<br>"
@@ -105,27 +101,15 @@ if uploaded_file is not None:
                     )
                     marker.add_to(marker_cluster)
 
-                    # Store marker data
-                    marker_popups[(row["Latitude"], row["Longitude"])] = row.to_dict()
-
-                # Add markers for start and end points with labels
                 folium.Marker(
                     start_point, popup="🟢 Start Position", icon=folium.Icon(color="green")
-                ).add_to(m)
+                ).add_to(st.session_state.map)
 
                 folium.Marker(
                     end_point, popup="🔴 End Position", icon=folium.Icon(color="red")
-                ).add_to(m)
+                ).add_to(st.session_state.map)
 
-                # Add polyline for movement path
-                folium.PolyLine(locations, color="blue", weight=3, opacity=0.8).add_to(m)
+                folium.PolyLine(locations, color="blue", weight=3, opacity=0.8).add_to(st.session_state.map)
 
-                # Display map in Streamlit
-                map_data = st_folium(m, width=1000, height=600)
-
-                # If a marker is clicked, show corresponding data
-                if map_data["last_clicked"]:
-                    clicked_coords = tuple(map_data["last_clicked"].values())
-                    if clicked_coords in marker_popups:
-                        st.subheader("📌 Selected Position Data:")
-                        st.write(pd.DataFrame([marker_popups[clicked_coords]]))
+            # Display the stored map
+            st_folium(st.session_state.map, width=1000, height=600)
