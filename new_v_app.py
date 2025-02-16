@@ -50,40 +50,25 @@ if uploaded_file is not None:
         df["Navigation Status"] = df["Navigation Status"].map(NAVIGATION_STATUS)
 
         unique_mmsi = df["MMSI"].unique()
-        selected_mmsi = st.selectbox("🚢 Select MMSI Number", unique_mmsi)
-
-        # Buttons for actions
-        if "show_table" not in st.session_state:
-            st.session_state.show_table = False
-        if "show_map" not in st.session_state:
-            st.session_state.show_map = False
-
-        col1, col2 = st.columns([1, 1])
-
-        with col1:
-            if st.button("📋 Display Data Table"):
-                st.session_state.show_table = True
-
-        with col2:
-            if st.button("🗺️ Plot Ship Movements"):
-                st.session_state.show_map = True
+        selected_mmsi = unique_mmsi[0]  # Automatically select the first MMSI
 
         vessel_data = df[df["MMSI"] == selected_mmsi].sort_values(by="Timestamp")
 
-        if st.session_state.show_table:
-            st.subheader(f"📊 Data for MMSI: {selected_mmsi}")
-            st.dataframe(vessel_data, height=400, width=1500)
+        # Display Data Table
+        st.subheader(f"📊 Data for MMSI: {selected_mmsi}")
+        st.dataframe(vessel_data, height=400, width=1500)
 
-        if st.session_state.show_map and not vessel_data.empty:
+        if not vessel_data.empty:
             locations = list(zip(vessel_data["Latitude"], vessel_data["Longitude"]))
             start_point = locations[0]
             end_point = locations[-1]
 
-            # Store the map in session state to prevent it from disappearing
+            # Create and store map
             if "map" not in st.session_state:
                 st.session_state.map = folium.Map(location=start_point, zoom_start=7, control_scale=True, tiles="cartodb positron")
                 marker_cluster = MarkerCluster().add_to(st.session_state.map)
 
+                # Add markers for each position
                 for i, row in vessel_data.iterrows():
                     popup_text = (
                         f"📍 **Position Info:**<br>"
@@ -101,6 +86,7 @@ if uploaded_file is not None:
                     )
                     marker.add_to(marker_cluster)
 
+                # Mark start and end points
                 folium.Marker(
                     start_point, popup="🟢 Start Position", icon=folium.Icon(color="green")
                 ).add_to(st.session_state.map)
@@ -109,6 +95,7 @@ if uploaded_file is not None:
                     end_point, popup="🔴 End Position", icon=folium.Icon(color="red")
                 ).add_to(st.session_state.map)
 
+                # Draw the polygon line path
                 folium.PolyLine(locations, color="blue", weight=3, opacity=0.8).add_to(st.session_state.map)
 
             # Display the stored map
