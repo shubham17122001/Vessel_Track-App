@@ -44,7 +44,7 @@ if uploaded_file is not None:
     df = pd.read_csv(uploaded_file)
 
     # Ensure required columns exist
-    required_cols = {"MMSI", "Latitude", "Longitude", "Timestamp", "Navigation_Status"}
+    required_cols = {"MMSI", "Latitude", "Longitude", "Timestamp", "Navigation Status"}
     if not required_cols.issubset(df.columns):
         st.error(f"CSV must contain: {required_cols}")
     else:
@@ -52,7 +52,7 @@ if uploaded_file is not None:
         df["Timestamp"] = pd.to_datetime(df["Timestamp"], unit='s')
         
         # Convert Navigation_Status to readable format
-        df["Navigation Status"] = df["Navigation_Status"].map(NAVIGATION_STATUS)
+        df["Navigation Status"] = df["Navigation Status"].map(NAVIGATION_STATUS)
 
         # Get unique MMSI numbers
         unique_mmsi = df["MMSI"].unique()
