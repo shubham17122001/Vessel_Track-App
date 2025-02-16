@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import folium
-from streamlit_folium import folium_static
+from streamlit_folium import folium_static, st_folium
 
 # Streamlit app title
 st.title("🚢 Vessel Movement Tracker")
@@ -41,13 +41,28 @@ if uploaded_file is not None:
             # Create map centered at the first location
             m = folium.Map(location=start_point, zoom_start=7)
 
+            # Dictionary to store popups for each marker
+            marker_popups = {}
+
             # Add markers for all positions with popups
             for i, row in vessel_data.iterrows():
-                folium.Marker(
+                popup_text = (
+                    f"📍 Position Info:<br>"
+                    f"<b>MMSI:</b> {row['MMSI']}<br>"
+                    f"<b>Latitude:</b> {row['Latitude']}<br>"
+                    f"<b>Longitude:</b> {row['Longitude']}<br>"
+                    f"<b>Timestamp:</b> {row['Timestamp']}"
+                )
+
+                marker = folium.Marker(
                     location=[row["Latitude"], row["Longitude"]],
-                    popup=folium.Popup(f"📍 Position Info:<br><b>MMSI:</b> {row['MMSI']}<br><b>Time:</b> {row['Timestamp']}", max_width=250),
+                    popup=popup_text,
                     icon=folium.Icon(color="blue", icon="info-sign")
-                ).add_to(m)
+                )
+                marker.add_to(m)
+
+                # Store marker information
+                marker_popups[(row["Latitude"], row["Longitude"])] = row.to_dict()
 
             # Add markers for start and end points
             folium.Marker(start_point, popup="Start Position", icon=folium.Icon(color="green")).add_to(m)
@@ -57,7 +72,13 @@ if uploaded_file is not None:
             folium.PolyLine(locations, color="blue", weight=2.5, opacity=1).add_to(m)
 
             # Display the map in Streamlit
-            folium_static(m)
+            map_data = st_folium(m, width=700, height=500)
 
+            # Check if a marker is clicked
+            if map_data["last_clicked"]:
+                clicked_coords = tuple(map_data["last_clicked"].values())
+                if clicked_coords in marker_popups:
+                    st.subheader("📌 Selected Position Data:")
+                    st.write(pd.DataFrame([marker_popups[clicked_coords]]))
         else:
             st.error(f"No data available for MMSI {selected_mmsi}")
