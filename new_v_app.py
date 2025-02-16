@@ -38,8 +38,9 @@ if uploaded_file is not None:
             st.subheader(f"📊 Data for MMSI: {selected_mmsi}")
             st.write(vessel_data)
 
-            # Create map centered at the first location
-            m = folium.Map(location=start_point, zoom_start=7)
+            # Create map centered at the midpoint between the start and end points
+            mid_point = [(start_point[0] + end_point[0]) / 2, (start_point[1] + end_point[1]) / 2]
+            m = folium.Map(location=mid_point, zoom_start=6)  # Adjust zoom for both points
 
             # Dictionary to store popups for each marker
             marker_popups = {}
@@ -71,8 +72,8 @@ if uploaded_file is not None:
             # Add polyline for movement path
             folium.PolyLine(locations, color="blue", weight=2.5, opacity=1).add_to(m)
 
-            # Display the map in Streamlit
-            map_data = st_folium(m, width=700, height=500)
+            # Display the map in Streamlit with updated width and height
+            map_data = st_folium(m, width=900, height=600)  # Increased width and height
 
             # Check if a marker is clicked
             if map_data["last_clicked"]:
