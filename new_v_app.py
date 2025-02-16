@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import folium_static, st_folium
-from geopy.geocoders import Nominatim
 
 # Streamlit app title
 st.title("🚢 Vessel Movement Tracker")
@@ -41,7 +40,7 @@ if uploaded_file is not None:
 
             # Create map centered at the midpoint between the start and end points
             mid_point = [(start_point[0] + end_point[0]) / 2, (start_point[1] + end_point[1]) / 2]
-            m = folium.Map(location=mid_point, zoom_start=6)
+            m = folium.Map(location=mid_point, zoom_start=6)  # Adjust zoom for both points
 
             # Dictionary to store popups for each marker
             marker_popups = {}
@@ -89,27 +88,13 @@ if uploaded_file is not None:
             folium.PolyLine(locations, color="blue", weight=2.5, opacity=1).add_to(m)
 
             # Display the map in Streamlit with updated width and height
-            map_data = st_folium(m, width=900, height=600)
+            map_data = st_folium(m, width=900, height=600)  # Increased width and height
 
-            # Timestamp selection for fetching region info
-            timestamp_options = vessel_data["Timestamp"].dt.strftime('%Y-%m-%d %H:%M:%S').unique()
-            selected_timestamp = st.selectbox("Select Timestamp", timestamp_options)
-
-            # Button to fetch region info based on timestamp
-            if st.button("Get Region Info"):
-                # Find the corresponding row based on timestamp
-                selected_row = vessel_data[vessel_data["Timestamp"].dt.strftime('%Y-%m-%d %H:%M:%S') == selected_timestamp].iloc[0]
-                lat = selected_row["Latitude"]
-                lon = selected_row["Longitude"]
-
-                # Use geopy to get the region name
-                geolocator = Nominatim(user_agent="region_finder")
-                location = geolocator.reverse((lat, lon), language='en', timeout=10)
-
-                if location:
-                    region_name = location.raw.get('address', {}).get('country', 'Region not found')
-                    st.write(f"🌍 Region for Coordinates (Lat: {lat}, Lon: {lon}) at {selected_timestamp}: {region_name}")
-                else:
-                    st.write("Region not found for the given coordinates.")
+            # Check if a marker is clicked
+            if map_data["last_clicked"]:
+                clicked_coords = tuple(map_data["last_clicked"].values())
+                if clicked_coords in marker_popups:
+                    st.subheader("📌 Selected Position Data:")
+                    st.write(pd.DataFrame([marker_popups[clicked_coords]]))
         else:
             st.error(f"No data available for MMSI {selected_mmsi}")
